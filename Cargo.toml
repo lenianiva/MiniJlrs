@@ -1,0 +1,12 @@
+[package]
+name = "minijlrs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jlrs = { version = "0.21.1", features = ["jlrs-derive", "ccall", "julia-1-11"] }
+[dev-dependencies]
+jlrs = { version = "0.21.1", features = ["jlrs-derive", "ccall", "julia-1-11", "local-rt"] }
