@@ -37,22 +37,22 @@ impl Expr {
 }
 #[repr(C)]
 #[derive(
-	Clone, Debug, Unbox, IntoJulia, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg,
+	Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
 )]
 #[cfg_attr(not(test), jlrs(julia_type = "MyModule.Datum"))]
 #[cfg_attr(test, jlrs(julia_type = "Main.Datum"))]
-pub struct Datum {
-	pub x: Option<TypedRankedArrayRet<u8, 1>>,
+pub struct Datum<'scope, 'data> {
+	pub x: Option<TypedRankedArrayRef<'scope, 'data, u8, 1>>,
 }
 
-fn generate() -> TypedValueRet<Datum> {
+fn generate() -> Datum<'static, 'static> {
 	unimplemented!()
 }
 
 julia_module! {
 	become mymodule_init_fn;
 
-	fn generate() -> TypedValueRet<Datum>;
+	fn generate() -> Datum<'static, 'static>;
 
 	struct Expr as Expression;
 	in Expr fn new_zero() -> TypedValueRet<Expr> as Zero;
