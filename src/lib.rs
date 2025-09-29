@@ -46,7 +46,15 @@ pub struct Datum<'scope, 'data> {
 }
 
 fn generate() -> Datum<'static, 'static> {
-	unimplemented!()
+	match weak_handle!() {
+		Err(_) => panic!("Not called from Julia"),
+		Ok(handle) => handle.local_scope::<_, 1>(|mut frame| {
+			let x = TypedRankedArray::new(&mut frame, (3,))
+				.expect("E1")
+				.leak();
+			Datum { x: Some(x) }
+		}),
+	}
 }
 
 julia_module! {

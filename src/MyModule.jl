@@ -14,9 +14,11 @@ end
 path_lib = Base.abspath("target/debug/libminijlrs.so")
 include_dependency(path_lib)
 
+
 @wrapmodule(path_lib, :mymodule_init_fn)
 
 function __init__()
+    @lock JlrsCore.package_lock JlrsCore.loaded_packages[:MyModule] = @__MODULE__
     @initjlrs
 end
 
