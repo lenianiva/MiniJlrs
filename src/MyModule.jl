@@ -6,8 +6,8 @@ using Base: Module
 using JlrsCore.Wrap
 
 print("The module is $(@__MODULE__)")
-struct Datum
-	x::Array{UInt8, 1}
+Base.@kwdef mutable struct Datum
+	x::Array{UInt8, 1} = [1]
 end
 
 path_lib = Base.abspath("target/debug/libminijlrs.$(Base.Libc.Libdl.dlext)")

@@ -1,12 +1,16 @@
+use std::borrow::BorrowMut;
+
 use jlrs::{
 	data::{
 		managed::{
 			array::{ArrayRet, TypedRankedArrayRet},
+			ccall_ref::CCallRef,
 			string::StringRet,
-			value::typed::{TypedValue, TypedValueRet},
+			value::typed::{TypedValue, TypedValueRef, TypedValueRet},
 		},
 		types::foreign_type::OpaqueType,
 	},
+	error::{JlrsError, JuliaResultExt},
 	prelude::*,
 	weak_handle,
 };
@@ -49,24 +53,39 @@ fn generate() -> Datum<'static, 'static> {
 	match weak_handle!() {
 		Err(_) => panic!("Not called from Julia"),
 		Ok(handle) => handle.local_scope::<_, 1>(|mut frame| {
-			let x = TypedRankedArray::new(&mut frame, (3,))
-				.expect("E1")
-				.leak();
+			let x = TypedRankedArray::new(&mut frame, (3,)).expect("E1").leak();
 			Datum { x: Some(x) }
 		}),
 	}
 }
+fn populate(mut d: TypedValue<Datum<'static, 'static>>) -> JlrsResult<()> {
+	let mut inner = unsafe { d.track_exclusive() }?;
+	let z = match weak_handle!() {
+		Err(_) => panic!("Not called from Julia"),
+		Ok(handle) => handle.local_scope::<_, 1>(|mut frame| {
+			let data = vec![1u8, 2u8, 4u8];
+			let x = TypedRankedArray::from_vec(&mut frame, data, (3,))
+				.expect("result 1")
+				.leak()
+				.expect("e2");
+			x
+		}),
+	};
+	inner.x = Some(z);
+	Ok(())
+}
 
 julia_module! {
 	become mymodule_init_fn;
-
-	fn generate() -> Datum<'static, 'static>;
 
 	struct Expr as Expression;
 	in Expr fn new_zero() -> TypedValueRet<Expr> as Zero;
 
 	#[untracked_self]
 	in Expr fn to_string(&self) -> StringRet as Base.string;
+
+	fn generate() -> Datum<'static, 'static>;
+	fn populate(d: TypedValue<Datum<'static, 'static>>) -> JlrsResult<()> as populate!;
 }
 
 #[cfg(test)]
