@@ -7,6 +7,6 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-jlrs = { version = "0.21.1", features = ["jlrs-derive", "ccall", "julia-1-11"] }
+jlrs = { version = "0.22.1", features = ["jlrs-derive", "ccall"] }
 [dev-dependencies]
-jlrs = { version = "0.21.1", features = ["jlrs-derive", "ccall", "julia-1-11", "local-rt"] }
+jlrs = { version = "0.22.1", features = ["jlrs-derive", "ccall", "local-rt"] }
