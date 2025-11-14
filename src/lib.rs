@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{sync::Arc, thread::JoinHandle};
 
 use jlrs::{
-	data::{
-		managed::{
-			array::{ArrayRet, TypedRankedArrayRet, TypedVectorRet},
-			string::StringRet,
-			value::typed::{TypedValue, TypedValueRet},
+	data::managed::{
+		string::StringRet,
+		value::{
+			typed::{TypedValue, TypedValueRet},
+			ValueRet,
 		},
 	},
 	prelude::*,
@@ -17,7 +17,6 @@ use jlrs::{
 struct Expr {
 	s: String,
 }
-
 impl Expr {
 	fn new_zero() -> TypedValueRet<Self> {
 		let x = Self {
@@ -37,63 +36,112 @@ impl Expr {
 	}
 }
 
+pub fn create_compat_runtime() -> std::io::Result<tokio::runtime::Runtime> {
+	tokio::runtime::Builder::new_current_thread()
+		.enable_time()
+		//.worker_threads(threads)
+		//.on_thread_start(|| {
+		//	assert!(!ADOPTED.get());
+		//	// Extracted from `jlrs`'s `MtHandle`
+		//	let mut ptls = unsafe { jlrs_get_ptls_states() };
+		//	if ptls.is_null() {
+		//		let pgcstack = unsafe { jl_adopt_thread() };
+		//		ptls = unsafe { jlrs_ptls_from_gcstack(pgcstack) };
+		//	}
+		//	unsafe { jlrs_gc_safe_enter(ptls) };
+		//	ADOPTED.set(true);
+		//	unsafe { jl_enter_threaded_region() };
+		//})
+		//.on_thread_stop(|| {
+		//	let ptls = unsafe { jlrs_get_ptls_states() };
+		//	unsafe { jlrs_gc_safe_enter(ptls) };
+		//})
+		.build()
+}
 #[repr(C)]
-#[derive(Clone, Debug, OpaqueType)]
-struct ExprR(Arc<String>);
-
-fn create_array_of_expr() -> TypedVectorRet<ExprR> {
-	match weak_handle!() {
-		Err(e) => panic!("not called from julia"),
-		Ok(handle) => handle.local_scope::<_, 12>(|mut frame| {
-			let n = 10;
-			let mut v = TypedVector::<ExprR>::new(&mut frame, n).expect("Incompatible size and layout");
-			let mut accessor = unsafe { v.indeterminate_data_mut() };
-			for i in 1..n {
-				let expr =
-					"test".to_string();
-				let value = Value::new(&mut frame, ExprR(Arc::new(expr)));
-				accessor
-					.set_value(&mut frame, i, value)
-					.expect("Index out of bounds, which is impossible")
-					.expect("Caught exception");
+#[derive(Debug, OpaqueType)]
+pub struct Runtime {
+	pub runtime: Arc<tokio::runtime::Runtime>,
+	pub join_handle: JoinHandle<()>,
+}
+impl Runtime {
+	fn new() -> TypedValueRet<Self> {
+		let join_handle = std::thread::Builder::new()
+			.spawn(|| {
+				std::thread::sleep_ms(10000);
+			})
+			.unwrap();
+		match weak_handle!() {
+			Ok(handle) => {
+				let x = Self {
+					runtime: Arc::new(create_compat_runtime().unwrap()),
+					join_handle,
+				};
+				TypedValue::new(handle, x).leak()
 			}
-			v.leak()
-		}),
+			Err(_) => panic!("Not called from Julia"),
+		}
 	}
 }
-
 #[repr(C)]
-#[derive(
-	Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField, ConstructType, CCallArg, CCallReturn,
-)]
-#[cfg_attr(not(test), jlrs(julia_type = "MyModule.Datum"))]
-#[cfg_attr(test, jlrs(julia_type = "Main.Datum"))]
-pub struct Datum<'scope, 'data> {
-	//pub x: Option<TypedRankedArrayRef<'scope, 'data, u8, 1>>,
-	pub x: Option<WeakTypedArray<'scope, 'data, u8>>,
+#[derive(Debug, ForeignType)]
+pub struct Agent {
+	name: String,
+	/**
+	The callback function, which generates [`TacticQueue`] given a goal.
+	 */
+	#[jlrs(mark)]
+	callback: ValueRet,
 }
-
-fn generate() -> Datum<'static, 'static> {
-	match weak_handle!() {
-		Err(_) => panic!("Not called from Julia"),
-		Ok(handle) => handle.local_scope::<_, 1>(|mut frame| {
-			let x = TypedArray::new(&mut frame, [3]).expect("E1").leak();
-			Datum { x: Some(x) }
-		}),
+unsafe impl Send for Agent {}
+unsafe impl Sync for Agent {}
+impl Agent {
+	pub fn new(name: JuliaString, callback: Value<'_, 'static>) -> JlrsResult<TypedValueRet<Self>> {
+		let name = name.as_str()?.to_string();
+		match weak_handle!() {
+			Ok(handle) => {
+				let data = Self {
+					name,
+					callback: callback.leak(),
+				};
+				Ok(TypedValue::new(handle, data).leak())
+			}
+			Err(_e) => unreachable!(),
+		}
+	}
+	pub fn check(&self) -> JlrsResult<()> {
+		match weak_handle!() {
+			Ok(handle) => handle.local_scope::<_, 3>(|mut frame| {
+				let callback = unsafe { self.callback.as_value() };
+				let o = Value::new(&mut frame, 123);
+				let result = unsafe { callback.call(&mut frame, [o]) }.expect("Error 1");
+				let _e = result.unbox::<Expr>()?;
+				Ok(())
+			}),
+			Err(_e) => unreachable!(),
+		}
 	}
 }
 
 julia_module! {
 	become mymodule_init_fn;
 
-	fn generate() -> Datum<'static, 'static>;
-
 	struct Expr as Expression;
-	struct ExprR as ExprR;
 	in Expr fn new_zero() -> TypedValueRet<Expr> as Zero;
 
 	#[untracked_self]
 	in Expr fn to_string(&self) -> StringRet as Base.string;
+
+	struct Runtime;
+
+	in Runtime fn new() -> TypedValueRet<Runtime> as Runtime;
+
+	struct Agent;
+	in Agent fn new(
+		name: JuliaString,
+		callback: Value<'_, 'static>,
+	) -> JlrsResult<TypedValueRet<Agent>> as Agent;
+	in Agent fn check(&self) -> JlrsResult<()>;
 }
 
 #[cfg(test)]

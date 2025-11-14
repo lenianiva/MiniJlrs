@@ -13,11 +13,10 @@ end
 path_lib = Base.abspath("target/debug/libminijlrs.$(Base.Libc.Libdl.dlext)")
 include_dependency(path_lib)
 
-
 @wrapmodule(path_lib, :mymodule_init_fn)
 
 function __init__()
-    @lock JlrsCore.package_lock JlrsCore.loaded_packages[:MyModule] = @__MODULE__
+    #@lock JlrsCore.package_lock JlrsCore.loaded_packages[:MyModule] = @__MODULE__
     @initjlrs
 end
 

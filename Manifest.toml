@@ -2,7 +2,7 @@
 
 julia_version = "1.11.7"
 manifest_format = "2.0"
-project_hash = "3faf2f24060eb2c975c73e8999f5befc201debf8"
+project_hash = "f0537e7cbe7c86d5d8b9d4ba7356d068c5f0319d"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -21,25 +21,19 @@ version = "1.7.1"
 
 [[deps.JlrsCore]]
 deps = ["JlrsLedger_jll", "Libdl"]
-git-tree-sha1 = "db4c8ced88218b026a72569f9e08dc0712d679f9"
+git-tree-sha1 = "ea7ea134e6ad303e34ea6a281621051946446691"
 uuid = "29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"
-version = "0.5.0"
+version = "0.6.1"
 
 [[deps.JlrsLedger_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll"]
-git-tree-sha1 = "044ef174b6099164d6735455ba5ec803263b9240"
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "470dc485de38ddc92e395c37d47755e5b3cb580b"
 uuid = "946c7259-7191-581b-9320-f4a77977c88e"
-version = "0.1.0+0"
+version = "0.2.0+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 version = "1.11.0"
-
-[[deps.Libiconv_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "be484f5c92fad0bd8acfef35fe017900b0b73809"
-uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
-version = "1.18.0+0"
 
 [[deps.Preferences]]
 deps = ["TOML"]
