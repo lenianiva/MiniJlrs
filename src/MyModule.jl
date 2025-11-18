@@ -21,5 +21,7 @@ function __init__()
     @initjlrs
 end
 
+export Environment, Action, Agent, Trajectory, play
+
 end
 
