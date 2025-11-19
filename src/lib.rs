@@ -2,8 +2,7 @@ use jlrs::{
 	data::managed::{
 		string::StringRet,
 		value::{
-			typed::{TypedValue, TypedValueRet},
-			ValueRet,
+			tracked::Tracked, typed::{TypedValue, TypedValueRet}, ValueRet
 		},
 	},
 	memory::gc::{gc_safe, gc_unsafe},
@@ -53,7 +52,7 @@ impl Action {
 	}
 }
 
-#[derive(Debug, Clone, ForeignType)]
+#[derive(Debug, ForeignType)]
 pub struct Agent {
 	name: String,
 	#[jlrs(mark)]
@@ -61,6 +60,20 @@ pub struct Agent {
 }
 unsafe impl Send for Agent {}
 unsafe impl Sync for Agent {}
+impl Clone for Agent
+{
+	fn clone(&self) -> Self {
+		match weak_handle!() {
+			Ok(handle) => {
+				Self {
+					name: self.name.clone(),
+					callback: unsafe { self.callback.root(&handle) }.leak()
+				}
+			}
+			Err(e) => panic!("Not called from Julia"),
+		}
+	}
+}
 impl Agent {
 	pub fn new(name: JuliaString, callback: Value<'_, 'static>) -> JlrsResult<TypedValueRet<Self>> {
 		let name = name.as_str()?.to_string();
@@ -78,11 +91,13 @@ impl Agent {
 	fn act(&self, env: Environment) -> Action {
 		unsafe {
 			gc_unsafe(|handle| {
-				handle.local_scope::<_, 2>(|mut frame| {
+				handle.local_scope::<_, 3>(|mut frame| {
 					let callback = self.callback.as_value();
 					let env = Value::new(&mut frame, env);
 					let result = callback.call(&mut frame, [env]).expect("Error 1");
-					result.unbox::<Action>().unwrap()
+					result.leak().as_value().unbox::<Action>().unwrap()
+					//let action: Tracked<'_, '_, '_, Action> = result.track_shared().expect("track");
+					//action.clone()
 				})
 			})
 		}
@@ -97,17 +112,20 @@ struct Trajectory {
 fn play_loop(agent: Agent, steps: usize) -> Trajectory {
 	let env = Environment { s: "".to_string() };
 	let mut actions = vec![];
-	for _i in 0..steps {
+	for i in 0..steps {
+		eprintln!("call {i}");
 		let Action { s } = agent.act(env.clone());
 		actions.push(s);
 	}
 	Trajectory { actions }
 }
 fn play(agent: TypedValue<'_, '_, Agent>, steps: usize) -> JlrsResult<TypedValueRet<Trajectory>> {
-	let agent = agent.unbox::<Agent>()?;
-	let t = unsafe { gc_safe(|| play_loop(agent, steps)) };
+	let agent_r = agent.unbox::<Agent>()?;
 	match weak_handle!() {
-		Ok(handle) => Ok(TypedValue::new(handle, t).leak()),
+		Ok(handle) => handle.with_local_scope::<_, 2>(|handle, mut frame| {
+			let t = unsafe { gc_safe(|| play_loop(agent_r, steps)) };
+			Ok(TypedValue::new(handle, t).leak())
+		}),
 		Err(e) => panic!("Not called from Julia"),
 	}
 }

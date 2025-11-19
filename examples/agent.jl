@@ -1,4 +1,6 @@
 using MyModule
 
+@info "create agent"
 a = Agent("test", (x) -> Action("action"))
-play(a, UInt(1))
+@info "play"
+play(a, UInt(3))
