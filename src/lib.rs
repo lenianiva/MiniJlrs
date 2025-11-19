@@ -52,7 +52,7 @@ impl Action {
 	}
 }
 
-#[derive(Debug, ForeignType)]
+#[derive(Clone, Debug, ForeignType)]
 pub struct Agent {
 	name: String,
 	#[jlrs(mark)]
@@ -60,20 +60,6 @@ pub struct Agent {
 }
 unsafe impl Send for Agent {}
 unsafe impl Sync for Agent {}
-impl Clone for Agent
-{
-	fn clone(&self) -> Self {
-		match weak_handle!() {
-			Ok(handle) => {
-				Self {
-					name: self.name.clone(),
-					callback: unsafe { self.callback.root(&handle) }.leak()
-				}
-			}
-			Err(e) => panic!("Not called from Julia"),
-		}
-	}
-}
 impl Agent {
 	pub fn new(name: JuliaString, callback: Value<'_, 'static>) -> JlrsResult<TypedValueRet<Self>> {
 		let name = name.as_str()?.to_string();
@@ -95,9 +81,9 @@ impl Agent {
 					let callback = self.callback.as_value();
 					let env = Value::new(&mut frame, env);
 					let result = callback.call(&mut frame, [env]).expect("Error 1");
-					result.leak().as_value().unbox::<Action>().unwrap()
-					//let action: Tracked<'_, '_, '_, Action> = result.track_shared().expect("track");
-					//action.clone()
+					//result.leak().as_value().unbox::<Action>().unwrap()
+					let action: Tracked<'_, '_, '_, Action> = result.track_shared().expect("track");
+					action.clone()
 				})
 			})
 		}
